@@ -6,7 +6,7 @@ reference : books and program codes
 https://github.com/YutaroOgawa/Deep-Reinforcement-Learning-Book
 https://tadaoyamaoka.booth.pm/items/1830557
 
-library for osero game and reinforcement learning environment
+library for othello game and reinforcement learning environment
 https://github.com/TadaoYamaoka/creversi
 
 """
