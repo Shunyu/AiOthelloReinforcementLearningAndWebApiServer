@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-リバーシのDQN実装
+リバーシのDQNの学習コードの実装に際して、以下を参考にさせていただいた。
 
 reference : books and program codes
 https://github.com/YutaroOgawa/Deep-Reinforcement-Learning-Book
@@ -51,8 +51,9 @@ device = torch.device("cpu")
 #%%
 
 """
-経験データ(transition)のタプルをnamedtupleとして定義します。
-通常、経験データは{現在の状態, 選択した行動, 次の状態, 報酬}の4つですが、効率化のために次の状態(局面)の合法手の一覧も格納するようにします。
+経験データ(transition)のタプルをnamedtupleとして定義する。
+通常、経験データは{現在の状態, 選択した行動, 次の状態, 報酬}の4つですが、効率化のために次の状態(局面)の合法手の一覧も格納するようにする。
+上述の書籍を参考にした。
 
 define ReplayMemory management class.
 define TDErrorMemory management class, which is used for Prioritized Experience Replay.
@@ -136,6 +137,12 @@ class TDErrorMemory(object):
 # DQN
 # Normal CNN
 class NormalNetwork(nn.Module):
+    """
+        通常の畳み込みニューラルネットの構造をもつクラス
+
+        AIオセロを組み込んだシステムの実装を優先しており、精度向上について、様々なモデルを探索しきれていない。
+        推論モデルに用いる仮のアーキテクチャとして、こちらを採用した。
+    """
 
     def __init__(self, k, fcl_units):
         super(NormalNetwork, self).__init__()
@@ -187,7 +194,12 @@ class NormalNetwork(nn.Module):
 #%%
 # Dueling Network
 class DuelingNetwork(nn.Module):
+    """
+        Duelingネットワークの構造をもつクラス
 
+        AIオセロを組み込んだシステムの実装を優先しており、精度向上について、様々なモデルを探索しきれていない。
+        推論モデルに用いる仮のアーキテクチャとして、こちらの採用は行わなかった。
+    """
     def __init__(self, k, fcl_units):
         super(DuelingNetwork, self).__init__()
         
@@ -289,15 +301,21 @@ class Block(nn.Module):
         return nn.Conv2d(channel_in, channel_out, kernel_size=(1, 1), padding=0)
 
 
-class GloblAvgPool2d(nn.Module):
+class GlobalAvgPool2d(nn.Module):
     def __init__(self, device='cpu'):
-        super(GloblAvgPool2d, self).__init__()
+        super(GlobalAvgPool2d, self).__init__()
 
     def forward(self, x):
         return F.avg_pool2d(x, kernel_size=x.size()[2:]).view(-1, x.size(1))
 
 class ResNet50(nn.Module):
-    # def __init__(self, output_dim):
+    """
+        ResNetの構造をもつクラス
+
+        AIオセロを組み込んだシステムの実装を優先しており、精度向上について、様々なモデルを探索しきれていない。
+        推論モデルに用いる仮のアーキテクチャとして、こちらの採用は行わなかった。
+        また、こちらのResNetは、ソースコードは書いたものの、実行自体、一度もしていない点にも注意。
+    """
     def __init__(self):
         super(ResNet50, self).__init__()
 
@@ -360,6 +378,9 @@ class ResNet50(nn.Module):
 
 #%%
 class Brain:
+    """
+        DQNにて、ネットワークのパラメータ最適化に関わるクラス
+    """
     
     def __init__(self, network_mode, k, fcl_units, batch_sampling_mode, dqn_mode):
 
@@ -480,7 +501,11 @@ class Brain:
                 expected_state_action_values = next_state_values * GAMMA + self.reward_batch
                 
         return expected_state_action_values
+        
     def update_policy_net(self):
+        """
+            モデルのパラメータ最適化に関わる、最も中心的なメソッド。
+        """
         
         self.policy_net.train()
         
@@ -499,6 +524,10 @@ class Brain:
         return
         
     def optimize_model(self, i_episode):
+        """
+            このメソッドの中で、モデル(policy_net)のパラメータ最適化を実施している。
+            この中でも特に、update_policy_netにて、最適化を実施。
+        """
         
         if len(self.memory) < BATCH_SIZE:
             return
@@ -566,6 +595,9 @@ class Brain:
         return elapsed_time_of_update_td_error_memory
     
     def update_target_net(self):
+        """
+            policy_netの現時点でのパラメータ最適化結果を、target_net側にコピーする。
+        """
         
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
@@ -577,22 +609,42 @@ class Brain:
 #%% 
 
 class Agent:
+
+    """
+        強化学習におけるAgentに相当するクラス
+
+        brainインスタンスに用意された機能を用いながら、DQNにおけるネットワークのパラメータ最適化を進めるにあたり、
+        environment.run()では、brainインスタンスを直接操作するのではなく、
+        agent経由で、DQNの学習を進める。
+    """
     
     def __init__(self, network_mode, k, fcl_units, batch_sampling_mode, dqn_mode):
         self.brain = Brain(network_mode, k, fcl_units, batch_sampling_mode, dqn_mode)
         self.model_name = network_mode + "_" + str(k) + "_" + str(fcl_units) + "_" + batch_sampling_mode + "_" + dqn_mode
         
     def update_q_function(self, i_episode):
+        """
+            ここで、モデル(policy_net)のパラメータ最適化を、brainに依頼している。
+        """
         self.brain.optimize_model(i_episode)
         
     def get_action(self, state, board, episodes_done):
+        """
+            脳における判断に従って、行動を選択し、実行する。
+        """
         action = self.brain.select_action(state, board, episodes_done)
         return action
     
     def memorize(self, state, action, next_state, next_actions, reward):
+        """
+            environmentから、報酬や次なる状態などの情報を受領する。
+        """
         self.brain.memory.push(state, action, next_state, next_actions, reward)
         
     def update_target_q_function(self):
+        """
+            policy_netの現時点でのパラメータ最適化結果を、target_net側にコピーする。
+        """
         self.brain.update_target_net()
         
     def memorize_td_error(self, td_error):
@@ -617,6 +669,15 @@ class Agent:
 #%%
 class Environment:
     
+    """
+        強化学習におけるEnvironmentに相当するクラス
+        
+        brainインスタンスに用意された機能を用いながら、DQNにおけるネットワークのパラメータ最適化を進めるにあたり、
+        environment.run()では、brainインスタンスを直接操作するのではなく、
+        agent経由で、DQNの学習を進める。
+
+        environmentでは、agentが決定した行動を受けて、次なる状態や報酬を算出し、agentにその情報を引き渡す。 
+    """
     def __init__(self, network_mode, k, fcl_units, batch_sampling_mode, dqn_mode):
         
         # make gym enviroment
@@ -651,12 +712,16 @@ class Environment:
             
             for t in count():
                 # Select and perform an action
+                # agentが、行動を決定し、実行する
                 move, action = self.agent.get_action(state, self.env.board, episodes_done)
+                
+                # environmentによる、報酬の算出を行う
                 next_board, reward, done, is_draw = self.env.step(move)
         
                 reward = torch.tensor([reward], device=device)
         
                 # Observe new state
+                # environmentによる、次なる状態の算出を行う
                 if not done:
                     next_state = self.get_state(next_board)
                     next_actions = list(next_board.legal_moves)
@@ -665,6 +730,7 @@ class Environment:
                     next_actions = None
         
                 # Store the transition in memory
+                # agentに、報酬や次なる状態などの情報を伝達する
                 self.agent.memorize(state, action, next_state, next_actions, reward)
                 
                 # 
@@ -672,6 +738,7 @@ class Environment:
                     self.agent.memorize_td_error(0)
         
                 if done:
+                    # 無限ループから抜ける。
                     break
         
                 # Move to the next state
@@ -682,6 +749,7 @@ class Environment:
         
             if i_episode % OPTIMIZE_PER_EPISODES == OPTIMIZE_PER_EPISODES - 1:
                 # Perform several episodes of the optimization (on the target network)
+                # ここで、モデル(policy_net)のパラメータ最適化を、agent経由で呼び出している。
                 self.agent.update_q_function(i_episode)
                 
                 # update td error memory for prioritied experience replay
@@ -692,6 +760,7 @@ class Environment:
                 pbar.set_description(f'loss = {losses[-1]:.3e}')
         
                 # Update the target network, copying all weights and biases in DQN
+                # policy_netの現時点でのパラメータ最適化結果を、target_net側にコピーする。
                 if i_episode // OPTIMIZE_PER_EPISODES % TARGET_UPDATE == 0:
                     self.agent.update_target_q_function()
         self.agent.save_model(num_episodes)
@@ -712,6 +781,10 @@ class Environment:
 
 #%%
 class GreedyPlayer:
+    """
+        学習済のネットワークを用いて、最適手の推論を実施するPlayerを表すクラス
+        学習後に、モデルを評価する際(モデルを対決させて勝敗数を確認する際)に利用する。
+    """
     def __init__(self, model_path, device, model_setting):
         network_mode = model_setting['network_mode']
         k = model_setting['k']
@@ -739,6 +812,10 @@ class GreedyPlayer:
             return legal_moves[legal_q.argmax(dim=1).item()]
 
 class RandomPlayer:
+    """
+        石を置くことができる場所のうち、ランダムに手を選ぶPlayerを表すクラス
+        学習後に、モデルを評価する際(モデルを対決させて勝敗数を確認する際)に利用する。
+    """    
     def go(self, board):
         legal_moves = board.legal_moves
         if len(legal_moves) == 0:
@@ -748,13 +825,17 @@ class RandomPlayer:
 #%%
 def battle(player1, player2, model1, model1_setting, model2=None, model2_setting=None, games=100):
 
+    """
+        2つのplayerを戦わせて、勝敗数を出力する。
+    """
+
     players = []
     for player, model, model_setting in zip([player1, player2], [model1, model2], [model1_setting, model2_setting]):
         if player == 'random':
             players.append(RandomPlayer())
         elif player == 'greedy':
-            k = 192
-            fcl_units = 256
+            k = 192 # 使用していない
+            fcl_units = 256 # 使用していない
             players.append(GreedyPlayer(model, device, model_setting))
 
     black_won_count = 0
@@ -766,6 +847,7 @@ def battle(player1, player2, model1, model1_setting, model2=None, model2_setting
         board.reset()
         move = None
 
+        # 対戦の実施
         i = 0
         while not board.is_game_over():
             i += 1
@@ -779,6 +861,7 @@ def battle(player1, player2, model1, model1_setting, model2=None, model2_setting
 
             board.move(move)
 
+        # 対戦終了後の石の数の確認
         if board.turn == BLACK_TURN:
             piece_nums = [board.piece_num(), board.opponent_piece_num()]
         else:
@@ -798,12 +881,16 @@ def battle(player1, player2, model1, model1_setting, model2=None, model2_setting
     print(f'black:{black_won_count} white:{white_won_count} draw:{draw_count}')
 #%%
 def moving_average(losses, horizen=10):
+    """
+        (損失値について)移動平均値を計算する。
+    """
     
     losses_revised = np.convolve(losses, np.ones(horizen)/horizen, mode="valid")
     
     return losses_revised                        
 #%%
-## set DQN algorithm
+## DQNの訓練時に必要となる設定ここから
+
 # network_mode = "NormalNetwork"
 # network_mode = "DuelingNetwork"
 
@@ -820,7 +907,9 @@ def moving_average(losses, horizen=10):
 ## other setting 
 # num_episodes = 500
 
+## DQNの訓練時に必要となる設定ここまで
 
+##! DQNの訓練（少ないエピソード数で色々なパターンを試してみた場合）
 ## pattern 1
 
 network_mode = "NormalNetwork"
@@ -888,6 +977,8 @@ plt.plot(moving_average(losses_5, 10), color='gray', label='pattern 5')
 plt.legend()
 
 #%%
+##! 学習済モデルを用いて最適手予測を行うPlayerと、ランダムな手を用いたPlayerを対戦させる。
+
 player1 = 'greedy'
 player2 = 'random'
 model1 = '/home/shunyu/Code/osero/NormalNetwork_192_256_ExperienceReplay_FixedTargetQ-Network_model2000.pt'
@@ -936,6 +1027,7 @@ model1_setting['k'] = 192
 model1_setting['fcl_units'] = 256 
 battle(player1, player2, model1, model1_setting, model2=None, model2_setting=None, games=1000)
 #%%
+##! DQNの訓練（エピソード数を増やした場合）
 network_mode = "NormalNetwork"
 k = 192
 fcl_units = 256
@@ -949,6 +1041,7 @@ plt.plot(moving_average(losses_1, 100), color='red', label='pattern 1')
 plt.legend()
 
 #%%
+##! 学習済モデルを用いて最適手予測を行うPlayerと、ランダムな手を用いたPlayerを対戦させる。
 player1 = 'greedy'
 player2 = 'random'
 model1 = '/home/shunyu/Code/osero/NormalNetwork_192_256_ExperienceReplay_FixedTargetQ-Network_model100000.pt'
