@@ -1,5 +1,5 @@
 # AiOthelloReinforcementLearningAndWebApiServer
-強化学習によるAIオセロ機能の開発、学習済みモデルを用いた予測用APIの実装コード（公開版）。以下のURLでサービスを公開中。https://beautiful-setouchi.com/othello/homepage
+強化学習によるAIオセロ機能の開発、学習済みモデルを用いた予測用APIの実装コード（公開版）。円安によるコスト増を踏まえて、AWS上でのサービスの公開は停止中。
 <br>
 このレポジトリは、「アーキテクチャの全体像」に登場するコンポーネントのうち、右下の「AIオセロサーバー」部分に相当している。
 # アーキテクチャの全体像
